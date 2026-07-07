@@ -24,8 +24,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "BytesSDK",
-            url: "https://github.com/media-net/bytes-packages/releases/download/v0.2.0/BytesSDK-0.2.0.xcframework.zip",
-            checksum: "a05328ebd03bf7e67d589ff78815f7798300ccc961956eeea93884d4e94dc9b3"
+            url: "https://github.com/media-net/bytes-packages/releases/download/v1.0.0/BytesSDK-1.0.0.xcframework.zip",
+            checksum: "d2e64305c102cc4bea5732580c6ff777382156de3c8b39e46bba681b12b3b92f"
         ),
         // Media.net ad source — thin glue shipped as source. Mirrors the
         // adapter target in bytes-sdk-ios: depends on the core binary plus the

@@ -10,12 +10,12 @@ iOS 14+). Two products ship from here:
 
 Core sources are maintained privately in `media-net/bytes-sdk-ios`.
 
-Current release: **0.2.0**
+Current release: **1.0.0**
 
 ## Swift Package Manager
 
 ```swift
-.package(url: "https://github.com/media-net/bytes-packages.git", from: "0.2.0")
+.package(url: "https://github.com/media-net/bytes-packages.git", from: "1.0.0")
 ```
 
 Add `BytesSDK` to your target; add `BytesAdSourceMediaNet` too if you render
@@ -24,11 +24,24 @@ Media.net demand (it pulls `ios-packages` transitively).
 ## CocoaPods
 
 ```ruby
-pod 'BytesSDK', :podspec => 'https://raw.githubusercontent.com/media-net/bytes-packages/v0.2.0/BytesSDK.podspec'
+pod 'BytesSDK', :podspec => 'https://raw.githubusercontent.com/media-net/bytes-packages/v1.0.0/BytesSDK.podspec'
+```
+
+If you render Media.net demand, add the ad source. None of the Media.net pods
+are published to the CocoaPods trunk, so every podspec is referenced by URL —
+CocoaPods does not resolve external-source dependencies transitively:
+
+```ruby
+pod 'BytesAdSourceMediaNet', :podspec => 'https://raw.githubusercontent.com/media-net/bytes-packages/v1.0.0/BytesAdSourceMediaNet.podspec'
+pod 'MediaNetAdSDK', :podspec => 'https://raw.githubusercontent.com/media-net/ios-packages/main/MediaNetAdSDK.podspec'
+pod 'MediaNetRendererAdSDK', :podspec => 'https://raw.githubusercontent.com/media-net/ios-packages/main/MediaNetRendererAdSDK.podspec'
+pod 'MediaNetRendererCore', :podspec => 'https://raw.githubusercontent.com/media-net/ios-packages/main/MediaNetRendererCore.podspec'
+pod 'MNPrebidMobile', :podspec => 'https://raw.githubusercontent.com/media-net/ios-packages/main/MNPrebidMobile.podspec'
+pod 'OMSDK_Medianet', :podspec => 'https://raw.githubusercontent.com/media-net/ios-packages/main/OMSDK_Medianet.podspec'
 ```
 
 ## Manual
 
-Download `BytesSDK-0.2.0.xcframework.zip` from the
-[release assets](https://github.com/media-net/bytes-packages/releases/tag/v0.2.0)
+Download `BytesSDK-1.0.0.xcframework.zip` from the
+[release assets](https://github.com/media-net/bytes-packages/releases/tag/v1.0.0)
 and drag `BytesSDK.xcframework` into your target (Embed & Sign).
