@@ -35,6 +35,17 @@ internal protocol MediaNetSdkInitRunner {
 }
 
 internal final class DefaultMediaNetSdkInitRunner: MediaNetSdkInitRunner {
+    /// True once `MNRPluginRenderer.initialize` has called back (registered
+    /// or not). Until then Prebid doesn't list the plugin in an auction's
+    /// `ext` (#448). Thread-safe: set from the renderer's callback, read at
+    /// auction start.
+    static var rendererAnswered: Bool {
+        get { rendererLock.lock(); defer { rendererLock.unlock() }; return _rendererAnswered }
+        set { rendererLock.lock(); _rendererAnswered = newValue; rendererLock.unlock() }
+    }
+    private static let rendererLock = NSLock()
+    private static var _rendererAnswered = false
+
     func runInit(
         accountID: String,
         bundleIdentifier: String,
@@ -42,6 +53,7 @@ internal final class DefaultMediaNetSdkInitRunner: MediaNetSdkInitRunner {
     ) {
         #if DEBUG
         MediaNetAdSDKClient.shared.logLevel = .debug
+        MNRPluginRenderer.shared.logLevel = .debug
         #endif
         // Register the Media.net plugin renderer so bids tagged
         // `rendererName: MediaNetRenderer` render through MNRPluginRenderer
@@ -50,18 +62,23 @@ internal final class DefaultMediaNetSdkInitRunner: MediaNetSdkInitRunner {
         // the auction.
         MNRPluginRenderer.initialize(customerId: accountID) { registered in
             log.notice("MNRPluginRenderer registered=\(registered, privacy: .public)")
+            DefaultMediaNetSdkInitRunner.rendererAnswered = true
         }
         MediaNetAdSDKClient.shared.configure(
             accountID: accountID,
             bundleIdentifier: bundleIdentifier
         ) { status, _ in
-            // Per the wrapper docs, the only two statuses are .succeeded
-            // and .failed (plus @unknown default for forward-compat).
             switch status {
             case .succeeded:
                 MobileAds.shared.start(completionHandler: nil)
                 completion(true)
             case .failed:
+                completion(false)
+            case .disabled:
+                // Media.net's server-side kill switch: serving is off for this
+                // account on purpose, nothing is broken. No ads this session;
+                // the next launch's configure re-checks the server.
+                log.notice("Media.net SDK disabled by kill switch — no ads this session")
                 completion(false)
             @unknown default:
                 completion(false)

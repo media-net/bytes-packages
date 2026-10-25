@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "BytesSDK",
     platforms: [
-        .iOS(.v14),
+        .iOS(.v15),
     ],
     products: [
         .library(
@@ -18,23 +18,25 @@ let package = Package(
     ],
     dependencies: [
         // The ad source links the Media.net Ad SDK (and GoogleMobileAds
-        // transitively). Kept in sync with bytes-sdk-ios/Package.swift.
-        .package(url: "https://github.com/media-net/ios-packages", from: "0.4.6"),
+        // transitively) plus the Media.net renderer. Generated from
+        // bytes-sdk-ios/Package.swift — do not edit by hand.
+        .package(url: "https://github.com/media-net/medianetadsdk-dist", from: "1.0.2"),
+        .package(url: "https://github.com/media-net/ios-packages", from: "1.0.4"),
     ],
     targets: [
         .binaryTarget(
             name: "BytesSDK",
-            url: "https://github.com/media-net/bytes-packages/releases/download/v1.0.0/BytesSDK-1.0.0.xcframework.zip",
-            checksum: "d2e64305c102cc4bea5732580c6ff777382156de3c8b39e46bba681b12b3b92f"
+            url: "https://github.com/media-net/bytes-packages/releases/download/v1.0.2/BytesSDK-1.0.2.xcframework.zip",
+            checksum: "a1adec7358802502b3b26f117a339c5abc500307bd5893af3a2519b4ce6b2c28"
         ),
         // Media.net ad source — thin glue shipped as source. Mirrors the
         // adapter target in bytes-sdk-ios: depends on the core binary plus the
-        // ios-packages products it links (a binaryTarget cannot carry those).
+        // Media.net products it links (a binaryTarget cannot carry those).
         .target(
             name: "BytesAdSourceMediaNet",
             dependencies: [
                 "BytesSDK",
-                .product(name: "MediaNetAdSDK", package: "ios-packages"),
+                .product(name: "MediaNetAdSDK", package: "medianetadsdk-dist"),
                 .product(name: "MediaNetRendererAdSDK", package: "ios-packages"),
             ],
             path: "Sources/BytesAdSourceMediaNet"

@@ -1,7 +1,8 @@
 import UIKit
 import os
-import BytesSDK
+@_spi(BytesAdapter) import BytesSDK
 import MediaNetAdSDK
+import MediaNetRendererAdSDK
 import GoogleMobileAds
 
 /// ``BytesAdAdapter`` backed by the Media.net iOS Ad SDK (`MediaNetAdSDK`).
@@ -46,6 +47,12 @@ public final class MediaNetAdAdapter: BytesAdAdapter {
     private let bottomConfig: MediaNetPlacementConfig
     private let initializer: MediaNetSdkInitializer
     private let bannerFactory: BannerFactory
+
+    /// Sends the `mnet_renderer_not_ready` beacon. Main thread only (called from
+    /// `continueLoad`). Swapped in tests.
+    static var reportRendererNotReady: (BytesAdPlacement) -> Void = { placement in
+        MainActor.assumeIsolated { Bytes.logAdRendererNotReady(placement: placement) }
+    }
 
     /// Public constructor. The adapter owns the per-placement Prebid config
     /// ID, GAM ad unit, and sizes; the SDK only passes a ``BytesAdPlacement``.
@@ -106,10 +113,21 @@ public final class MediaNetAdAdapter: BytesAdAdapter {
         BytesAdSize(width: 300, height: 50),
     ]
 
+    /// Prebid account ID, sent on the OTA request as `pbsdk_account_id` so the server can fill `adt1`. Empty when blank.
+    public var otaRequestParams: [String: String] {
+        let trimmed = accountID.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? [:] : [BytesOTARequestParam.pbsdkAccountID: trimmed]
+    }
+
+    // BytesAdPlacement is not @frozen and this file ships as source, so each
+    // switch needs @unknown default or the host app's build warns (an error in
+    // the Swift 6 language mode). A placement this adapter doesn't know yet
+    // falls back to the card setup.
     private func config(for placement: BytesAdPlacement) -> MediaNetPlacementConfig {
         switch placement {
         case .card: return cardConfig
         case .bottom: return bottomConfig
+        @unknown default: return cardConfig
         }
     }
 
@@ -117,11 +135,66 @@ public final class MediaNetAdAdapter: BytesAdAdapter {
         switch placement {
         case .card: return cardSizes
         case .bottom: return bottomSizes
+        @unknown default: return cardSizes
         }
+    }
+
+    private static func formats(for placement: BytesAdPlacement) -> AdMediaFormat {
+        switch placement {
+        case .card: return [.banner, .video]
+        case .bottom: return .banner
+        @unknown default: return [.banner, .video]
+        }
+    }
+
+    private static func formatsDescription(_ formats: AdMediaFormat) -> String {
+        var parts: [String] = []
+        if formats.contains(.banner) { parts.append("banner") }
+        if formats.contains(.video) { parts.append("video") }
+        if formats.contains(.native) { parts.append("native") }
+        return parts.joined(separator: "+")
+    }
+
+    public func requestedAdSizes(for placement: BytesAdPlacement) -> [BytesAdSize] {
+        Self.sizes(for: placement)
     }
 
     public func maxAdSize(for placement: BytesAdPlacement) -> BytesAdSize? {
         Self.sizes(for: placement).max { $0.height < $1.height }
+    }
+
+    /// `<MediaNetAdSDK version>__<renderer version>`, for example `1.0.2__1.0.4`.
+    public var codeVersion: String? { Self.cachedCodeVersion }
+
+    /// Built once: both SDK versions are fixed for the life of the process.
+    // The renderer part is not a dedicated release version: it is the value
+    // Prebid matches against `bid.pluginRendererVersion`. It only tracks the
+    // renderer release since renderer 98dea2f (it was stuck at 1.0.0 before),
+    // so if the two diverge again, svr reports the wrong renderer version.
+    private static let cachedCodeVersion =
+        "\(MediaNetAdSDKClient.shared.sdkVersion)__\(MNRPluginRenderer.shared.version)"
+
+    static func maxSize(for placement: BytesAdPlacement) -> BytesAdSize? {
+        let sizes = sizes(for: placement)
+        guard let maxWidth = sizes.map(\.width).max(), let maxHeight = sizes.map(\.height).max() else {
+            return nil
+        }
+        return BytesAdSize(width: maxWidth, height: maxHeight)
+    }
+
+    /// Starts the Media.net wrapper init (and the renderer plugin's
+    /// registration) at Bytes SDK init, so the plugin is usually registered —
+    /// and advertised in the auction request — by the time the first ad is
+    /// due. Does not delay auctions: `loadBanner` still waits only for the
+    /// wrapper's `configure`, as before.
+    public func prepare() {
+        log.notice("prepare — warming up Media.net SDK")
+        initializer.ensureInitialized(
+            accountID: accountID,
+            bundleIdentifier: bundleIdentifier
+        ) { initOk in
+            log.notice("prepare — Media.net SDK init \(initOk ? "ok" : "FAILED", privacy: .public)")
+        }
     }
 
     public func loadBanner(
@@ -138,14 +211,16 @@ public final class MediaNetAdAdapter: BytesAdAdapter {
             CGSize(width: $0.width, height: $0.height)
         }
         let allSizes = sizes
-            .map { "\($0.width)x\($0.height)" }
+            .map(\.dimensionString)
             .joined(separator: ",")
-        log.notice("loadBanner placement=\(String(describing: placement), privacy: .public) adUnit=\(config.adUnitID, privacy: .public) configID=\(config.configID, privacy: .public) sizes=\(allSizes, privacy: .public)")
+        let formats = Self.formats(for: placement)
+        log.notice("loadBanner placement=\(String(describing: placement), privacy: .public) adUnit=\(config.adUnitID, privacy: .public) configID=\(config.configID, privacy: .public) sizes=\(allSizes, privacy: .public) formats=\(Self.formatsDescription(formats), privacy: .public)")
         let banner = bannerFactory.create(
             configID: config.configID,
             adUnitID: config.adUnitID,
             adSize: cgSize,
-            additionalSizes: additionalCGSizes
+            additionalSizes: additionalCGSizes,
+            formats: formats
         )
         let handle = MediaNetBannerHandle(banner: banner)
 
@@ -167,6 +242,7 @@ public final class MediaNetAdAdapter: BytesAdAdapter {
                     initOk: initOk,
                     banner: banner,
                     handle: handle,
+                    placement: placement,
                     callback: callback
                 )
             }
@@ -181,7 +257,7 @@ public final class MediaNetAdAdapter: BytesAdAdapter {
             .flatMap { $0.windows }
             .first { $0.isKeyWindow }
         guard let window = keyWindow else { return }
-        view.frame.origin = .zero
+        view.frame.origin = CGPoint(x: 0, y: window.bounds.height * 2)
         view.alpha = Self.offscreenLoadAlpha
         view.isUserInteractionEnabled = false
         window.insertSubview(view, at: 0)
@@ -193,6 +269,7 @@ public final class MediaNetAdAdapter: BytesAdAdapter {
         initOk: Bool,
         banner: MediaNetBanner,
         handle: MediaNetBannerHandle,
+        placement: BytesAdPlacement,
         callback: BytesAdAdapterCallback
     ) {
         guard !handle.isDestroyed else {
@@ -216,11 +293,16 @@ public final class MediaNetAdAdapter: BytesAdAdapter {
         let prebidListener = MediaNetBannerListener(
             banner: banner,
             handle: handle,
+            placement: placement,
             callback: callback
         )
         banner.setListener(prebidListener)
         handle.retainListener(prebidListener)
         banner.disableAutoRefresh()
+        if !DefaultMediaNetSdkInitRunner.rendererAnswered {
+            log.notice("MNRPluginRenderer not registered yet — starting auction without it")
+            Self.reportRendererNotReady(placement)
+        }
         banner.loadAd()
     }
 }
@@ -285,6 +367,7 @@ internal final class MediaNetBannerHandle: BytesBannerAdHandle {
 internal final class MediaNetBannerListener: NSObject {
     private let bannerRef: () -> MediaNetBanner?
     private weak var handle: MediaNetBannerHandle?
+    private let placement: BytesAdPlacement
     private let callback: BytesAdAdapterCallback
 
     /// Pending → Loaded XOR Pending → Failed (atomic).
@@ -295,6 +378,7 @@ internal final class MediaNetBannerListener: NSObject {
     init(
         banner: MediaNetBanner,
         handle: MediaNetBannerHandle,
+        placement: BytesAdPlacement,
         callback: BytesAdAdapterCallback
     ) {
         // The bridge holds a strong ref to the underlying banner via the
@@ -302,12 +386,21 @@ internal final class MediaNetBannerListener: NSObject {
         // without retaining the high-level handle wrapper.
         self.bannerRef = { banner }
         self.handle = handle
+        self.placement = placement
         self.callback = callback
     }
 
     func onAdLoaded(creativeSize: CGSize? = nil) {
         log.notice("banner onAdLoaded")
         guard let handle, !handle.isDestroyed else { return }
+        phaseLock.lock()
+        let isPending = phase == .pending
+        phaseLock.unlock()
+        guard isPending else { return }
+        if let rejection = oversizeRejectionMessage(creativeSize: creativeSize) {
+            onAdFailed(message: rejection)
+            return
+        }
         if transitionTo(.loaded) {
             if let view = bannerRef()?.asView() {
                 view.alpha = 1
@@ -315,6 +408,20 @@ internal final class MediaNetBannerListener: NSObject {
                 callback.onAdLoaded(view, metadata: Self.metadata(creativeSize: creativeSize))
             }
         }
+    }
+
+    private func oversizeRejectionMessage(creativeSize: CGSize?) -> String? {
+        guard case .bottom = placement else { return nil }
+        guard let creativeSize, creativeSize.width > 0, creativeSize.height > 0 else {
+            return "creative size unknown for bottom placement"
+        }
+        guard let maxSize = MediaNetAdAdapter.maxSize(for: placement) else {
+            return nil
+        }
+        guard creativeSize.width > CGFloat(maxSize.width) || creativeSize.height > CGFloat(maxSize.height) else {
+            return nil
+        }
+        return "creative \(Int(creativeSize.width))x\(Int(creativeSize.height)) exceeds \(placement) max \(maxSize.width)x\(maxSize.height)"
     }
 
     private static func metadata(creativeSize: CGSize?) -> BytesAdMetadata {
@@ -329,9 +436,9 @@ internal final class MediaNetBannerListener: NSObject {
 
     func onAdFailed(message: String?) {
         log.notice("banner onAdFailed: \(message ?? "no fill", privacy: .public)")
-        bannerRef()?.asView().removeFromSuperview()
         guard let handle, !handle.isDestroyed else { return }
         if transitionTo(.failed) {
+            bannerRef()?.asView().removeFromSuperview()
             callback.onAdLoadFailed(
                 BytesAdError(
                     code: BytesAdError.codeNoFill,
@@ -359,6 +466,22 @@ internal final class MediaNetBannerListener: NSObject {
         if canFire { callback.onAdClicked() }
     }
 
+    func onClickthroughOpened() {
+        guard let handle, !handle.isDestroyed else { return }
+        phaseLock.lock()
+        let canFire = phase == .loaded
+        phaseLock.unlock()
+        if canFire { callback.onAdClickthroughOpened() }
+    }
+
+    func onClickthroughClosed() {
+        guard let handle, !handle.isDestroyed else { return }
+        phaseLock.lock()
+        let canFire = phase == .loaded
+        phaseLock.unlock()
+        if canFire { callback.onAdClickthroughClosed() }
+    }
+
     private func transitionTo(_ next: LoadPhase) -> Bool {
         phaseLock.lock(); defer { phaseLock.unlock() }
         guard phase == .pending else { return false }
@@ -382,7 +505,8 @@ internal protocol BannerFactory {
         configID: String,
         adUnitID: String,
         adSize: CGSize,
-        additionalSizes: [CGSize]
+        additionalSizes: [CGSize],
+        formats: AdMediaFormat
     ) -> MediaNetBanner
 }
 
@@ -399,7 +523,8 @@ internal final class DefaultBannerFactory: BannerFactory {
         configID: String,
         adUnitID: String,
         adSize: CGSize,
-        additionalSizes: [CGSize]
+        additionalSizes: [CGSize],
+        formats: AdMediaFormat
     ) -> MediaNetBanner {
         let validGADAdSizes = ([adSize] + additionalSizes).map {
             nsValue(for: adSizeFor(cgSize: $0))
@@ -415,6 +540,7 @@ internal final class DefaultBannerFactory: BannerFactory {
             eventHandler: eventHandler
         )
         banner.additionalSizes = additionalSizes.isEmpty ? nil : additionalSizes
+        banner.adFormat = formats
         return RealMediaNetBanner(banner: banner)
     }
 }
@@ -494,10 +620,7 @@ internal final class RealMediaNetBanner: NSObject, MediaNetBanner, BannerAdViewD
     func bannerView(_ view: BannerAdView, didReceiveAdWithAdSize adSize: CGSize) {
         banner.stopRefresh()
         if adSize.width > 0, adSize.height > 0 {
-            view.frame.size = CGSize(
-                width: max(adSize.width, view.bounds.width),
-                height: max(adSize.height, view.bounds.height)
-            )
+            view.frame.size = adSize
         }
         listener?.onAdLoaded(creativeSize: adSize)
     }
@@ -508,11 +631,16 @@ internal final class RealMediaNetBanner: NSObject, MediaNetBanner, BannerAdViewD
 
     func bannerViewWillPresentModal(_ view: BannerAdView) {
         listener?.onAdClicked()
+        listener?.onClickthroughOpened()
     }
 
-    func bannerViewDidDismissModal(_ view: BannerAdView) {}
+    func bannerViewDidDismissModal(_ view: BannerAdView) {
+        listener?.onClickthroughClosed()
+    }
 
-    func bannerViewWillLeaveApplication(_ view: BannerAdView) {}
+    func bannerViewWillLeaveApplication(_ view: BannerAdView) {
+        listener?.onAdClicked()
+    }
 }
 
 private let log = Logger(subsystem: "net.media.bytessdk.adsource.medianet", category: "MediaNetAdAdapter")
