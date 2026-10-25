@@ -32,22 +32,15 @@ and Google packages resolve automatically.
 
 ## Install with CocoaPods
 
-None of the Media.net pods are on the CocoaPods trunk, and CocoaPods does not
-resolve podspec URLs transitively, so every pod is listed by URL. The Media.net
-frameworks are static, so use static linkage.
+BytesSDK and BytesAdSourceMediaNet are on the CocoaPods trunk, and so are the Media.net pods they depend on. The Media.net frameworks are static, so use static linkage.
 
 ```ruby
 platform :ios, '15.0'
 use_frameworks! :linkage => :static
 
 target 'YourApp' do
-  pod 'BytesSDK', :podspec => 'https://raw.githubusercontent.com/media-net/bytes-packages/v1.0.2/BytesSDK.podspec'
-  pod 'BytesAdSourceMediaNet', :podspec => 'https://raw.githubusercontent.com/media-net/bytes-packages/v1.0.2/BytesAdSourceMediaNet.podspec'
-  pod 'MediaNetAdSDK', :podspec => 'https://raw.githubusercontent.com/media-net/medianetadsdk-dist/v1.0.2/MediaNetAdSDK.podspec'
-  pod 'MNPrebidMobile', :podspec => 'https://raw.githubusercontent.com/media-net/medianetadsdk-dist/v1.0.2/MNPrebidMobile.podspec'
-  pod 'MediaNetRendererAdSDK', :podspec => 'https://raw.githubusercontent.com/media-net/ios-packages/v1.0.4/MediaNetRendererAdSDK.podspec'
-  pod 'MediaNetRendererCore', :podspec => 'https://raw.githubusercontent.com/media-net/ios-packages/v1.0.4/MediaNetRendererCore.podspec'
-  pod 'OMSDK_Medianet', :podspec => 'https://raw.githubusercontent.com/media-net/OMSDK-Medianet-dist/1.5.5/OMSDK_Medianet.podspec'
+  pod 'BytesSDK', '1.0.2'
+  pod 'BytesAdSourceMediaNet', '1.0.2'
 end
 
 # Xcode 27 rejects deployment targets below iOS 15. Some of these pods declare
@@ -62,6 +55,10 @@ post_install do |installer|
   end
 end
 ```
+
+If `pod install` reports that it cannot find a compatible version of a Media.net
+pod, your local copy of the CocoaPods index predates that release. Run
+`pod install --repo-update` once.
 
 ## Configure your app
 
