@@ -163,7 +163,7 @@ public final class MediaNetAdAdapter: BytesAdAdapter {
         Self.sizes(for: placement).max { $0.height < $1.height }
     }
 
-    /// `<MediaNetAdSDK version>__<renderer version>`, for example `1.0.2__1.0.4`.
+    /// `<MediaNetAdSDK version>__<renderer version>`, for example `1.1.0__1.1.0`.
     public var codeVersion: String? { Self.cachedCodeVersion }
 
     /// Built once: both SDK versions are fixed for the life of the process.
