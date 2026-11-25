@@ -1,7 +1,7 @@
 # BytesSDK for iOS
 
 Media.net **BytesSDK** adds a full-screen, vertical-video (shorts-style) feed to
-an iOS app. Current release: **1.1.0**.
+an iOS app. Current release: **1.1.1**.
 
 Two products ship from this repo:
 
@@ -9,7 +9,7 @@ Two products ship from this repo:
   `vX.Y.Z` release.
 - **`BytesAdSourceMediaNet`**: the Media.net ad source, shipped as source. It
   links the Media.net Ad SDK (`media-net/medianetadsdk-dist` 1.1.0+), the Media.net
-  renderer (`media-net/ios-packages` 1.1.0+) and Google Mobile Ads. Add it
+  renderer (`media-net/ios-packages` 1.1.1+) and Google Mobile Ads. Add it
   to show Media.net ads in the feed.
 
 ## Requirements
@@ -24,7 +24,7 @@ In Xcode, choose File > Add Package Dependencies and enter the repo URL, or add
 it to `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/media-net/bytes-packages.git", from: "1.1.0")
+.package(url: "https://github.com/media-net/bytes-packages.git", from: "1.1.1")
 ```
 
 Add both `BytesSDK` and `BytesAdSourceMediaNet` to your app target. The Media.net
@@ -39,14 +39,14 @@ platform :ios, '15.0'
 use_frameworks! :linkage => :static
 
 target 'YourApp' do
-  pod 'BytesSDK', :podspec => 'https://raw.githubusercontent.com/media-net/bytes-packages/v1.1.0/BytesSDK.podspec'
-  pod 'BytesAdSourceMediaNet', :podspec => 'https://raw.githubusercontent.com/media-net/bytes-packages/v1.1.0/BytesAdSourceMediaNet.podspec'
+  pod 'BytesSDK', :podspec => 'https://raw.githubusercontent.com/media-net/bytes-packages/v1.1.1/BytesSDK.podspec'
+  pod 'BytesAdSourceMediaNet', :podspec => 'https://raw.githubusercontent.com/media-net/bytes-packages/v1.1.1/BytesAdSourceMediaNet.podspec'
 
   # Media.net Ad SDK and renderer
   pod 'MediaNetAdSDK', :podspec => 'https://raw.githubusercontent.com/media-net/medianetadsdk-dist/v1.1.0/MediaNetAdSDK.podspec'
   pod 'MNPrebidMobile', :podspec => 'https://raw.githubusercontent.com/media-net/medianetadsdk-dist/v1.1.0/MNPrebidMobile.podspec'
-  pod 'MediaNetRendererAdSDK', :podspec => 'https://raw.githubusercontent.com/media-net/ios-packages/v1.1.0/MediaNetRendererAdSDK.podspec'
-  pod 'MediaNetRendererCore', :podspec => 'https://raw.githubusercontent.com/media-net/ios-packages/v1.1.0/MediaNetRendererCore.podspec'
+  pod 'MediaNetRendererAdSDK', :podspec => 'https://raw.githubusercontent.com/media-net/ios-packages/v1.1.1/MediaNetRendererAdSDK.podspec'
+  pod 'MediaNetRendererCore', :podspec => 'https://raw.githubusercontent.com/media-net/ios-packages/v1.1.1/MediaNetRendererCore.podspec'
 end
 
 # Xcode 27 rejects deployment targets below iOS 15. Some of these pods declare
@@ -91,11 +91,8 @@ Bytes.initialize(
     cid: "<cid>",
     crid: "<crid>",
     appBundleId: Bundle.main.bundleIdentifier ?? "",
-    containerView: nil
-)
-
-Bytes.setAdAdapter(
-    MediaNetAdAdapter(
+    containerView: nil,
+    adapter: MediaNetAdAdapter(
         accountID: "<Media.net account ID>",
         card: MediaNetPlacementConfig(configID: "<card config ID>", adUnitID: "<card ad unit path>"),
         bottom: MediaNetPlacementConfig(configID: "<bottom config ID>", adUnitID: "<bottom ad unit path>")
@@ -178,9 +175,9 @@ it embeds it.
 
 ## Manual install
 
-Download `BytesSDK-1.1.0.xcframework.zip` from the
-[release assets](https://github.com/media-net/bytes-packages/releases/tag/v1.1.0),
+Download `BytesSDK-1.1.1.xcframework.zip` from the
+[release assets](https://github.com/media-net/bytes-packages/releases/tag/v1.1.1),
 unzip it, and drag `BytesSDK.xcframework` into your target with Embed & Sign.
-`BytesSDK-1.1.0.dSYMs.zip` holds the debug symbols for crash reports.
+`BytesSDK-1.1.1.dSYMs.zip` holds the debug symbols for crash reports.
 Media.net ads still need the ad source and its dependencies, so prefer Swift
 Package Manager or CocoaPods.

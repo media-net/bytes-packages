@@ -7,10 +7,14 @@ import GoogleMobileAds
 
 /// ``BytesAdAdapter`` backed by the Media.net iOS Ad SDK (`MediaNetAdSDK`).
 ///
-/// The host wires this once at app startup:
+/// The host wires this once, at `Bytes.initialize`:
 /// ```swift
-/// Bytes.setAdAdapter(
-///     MediaNetAdAdapter(
+/// Bytes.initialize(
+///     cid: "<cid>",
+///     crid: "<crid>",
+///     appBundleId: Bundle.main.bundleIdentifier ?? "",
+///     containerView: nil,
+///     adapter: MediaNetAdAdapter(
 ///         accountID: "8CU...",
 ///         bundleIdentifier: Bundle.main.bundleIdentifier ?? "",
 ///         card: MediaNetPlacementConfig(configID: "YOUR_STORED_IMP_ID", adUnitID: "/1234/card"),
@@ -98,12 +102,9 @@ public final class MediaNetAdAdapter: BytesAdAdapter {
         self.bannerFactory = bannerFactory
     }
 
-    /// Standardized in-feed card sizes (multiformat). 300×600 is primary; the
-    /// rest are requested as additional sizes in a single auction.
+    /// Standardized in-feed card sizes (multiformat).
     public static let cardSizes: [BytesAdSize] = [
-        BytesAdSize(width: 300, height: 600),
-        .mrec,                                   // 300×250
-        BytesAdSize(width: 320, height: 480),
+        BytesAdSize(width: 360, height: 640),
     ]
 
     /// Standardized docked bottom-banner sizes. 320×100 is primary.

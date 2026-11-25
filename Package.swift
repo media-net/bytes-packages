@@ -21,13 +21,13 @@ let package = Package(
         // transitively) plus the Media.net renderer. Generated from
         // bytes-sdk-ios/Package.swift — do not edit by hand.
         .package(url: "https://github.com/media-net/medianetadsdk-dist", from: "1.1.0"),
-        .package(url: "https://github.com/media-net/ios-packages", from: "1.1.0"),
+        .package(url: "https://github.com/media-net/ios-packages", from: "1.1.1"),
     ],
     targets: [
         .binaryTarget(
             name: "BytesSDK",
-            url: "https://github.com/media-net/bytes-packages/releases/download/v1.1.0/BytesSDK-1.1.0.xcframework.zip",
-            checksum: "d820ebad48762f2d9fe3df3733e45a170e6d152ab44938e88b89e0bf2c070de4"
+            url: "https://github.com/media-net/bytes-packages/releases/download/v1.1.1/BytesSDK-1.1.1.xcframework.zip",
+            checksum: "dbc58e2299e4623997079f5492b2ebe70886e11d6586fe5d8243b3368345631c"
         ),
         // Media.net ad source — thin glue shipped as source. Mirrors the
         // adapter target in bytes-sdk-ios: depends on the core binary plus the
